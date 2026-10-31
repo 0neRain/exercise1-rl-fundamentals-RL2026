@@ -52,6 +52,7 @@ def train(agent, env, train_episodes, early_stop=True, render=False,
         # Reset the environment and observe the initial state (it's a random initial state with small values)
         observation, _ = env.reset()
 
+
         # Loop until the episode is over
         while not done:
             # Get action from the agent
@@ -70,7 +71,10 @@ def train(agent, env, train_episodes, early_stop=True, render=False,
             # Perform the action on the environment, get new state and reward
             # note that after env._max_episode_steps the episode is over, if we stay alive that long
             observation, reward, terminated, truncated, info = env.step(action)
+
+                  
             done = terminated or truncated
+            
 
             # Task 3.1
             """

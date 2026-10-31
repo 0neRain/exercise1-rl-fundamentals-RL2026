@@ -72,15 +72,16 @@ def multiple_R(env, mp, mk, l, g, time_sleep=False, terminate=True):
     """
     Vary the value of R within the range [0.01, 0.1, 10, 100] and plot the forces 
     """
-    #TODO: 
-    # ...
+    
     return
 
 def control(env, mp, mk, l, g, time_sleep=False, terminate=True, seed=None):
     """
     Control using LQR
     """
-    #TODO: plot the states of the system ...
+
+    observation_history=[]  
+    titles = ["$x$", r"$\dot{x}$", r"$\theta$", r"$\dot{\theta}$"]
 
     obs, _ = env.reset(seed=seed)    # Reset the environment for a new episode
     
@@ -106,14 +107,28 @@ def control(env, mp, mk, l, g, time_sleep=False, terminate=True, seed=None):
         obs, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
         
+        observation_history.append(obs)
+
+
         if terminate and done:
             print(f'Terminated after {i+1} iterations.')
             break
 
+    x = np.arange(1, len(observation_history) + 1)
+    observation_history = np.array(observation_history)
+    
+    for i,data in enumerate(observation_history.T):
+        plt.plot(x,data, label=titles[i])
+
+    plt.axhline(y=0.003, color='black', linestyle=':', linewidth='1')
+    plt.axhline(y=-0.003, color='black', linestyle=':', linewidth='1')
+
+    plt.legend()
+    plt.show()
 # The main function
 def main(args):
     # Create a Gymnasium environment (CartPole-v1)
-    env = gym.make(args.env, render_mode="human")
+    env = gym.make(args.env)
 
     # Get dimensionalities of actions and observations
     action_space_dim = get_space_dim(env.action_space)
@@ -130,7 +145,7 @@ def main(args):
     mp, mk, l, g = pole.masspole, pole.masscart, pole.length, pole.gravity
 
     if args.mode == "control":
-        control(env, mp, mk, l, g, args.time_sleep, terminate=True, seed=args.seed)
+        control(env, mp, mk, l, g, args.time_sleep, terminate=False, seed=args.seed)
     elif args.mode == "multiple_R":
         multiple_R(env, mp, mk, l, g, args.time_sleep, terminate=True)
 
