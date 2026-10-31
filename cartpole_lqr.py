@@ -72,21 +72,25 @@ def multiple_R(env, mp, mk, l, g, time_sleep=False, terminate=True):
     """
     Vary the value of R within the range [0.01, 0.1, 10, 100] and plot the forces 
     """
-    
+    for R in [0.01, 0.1, 10, 100]:
+        control(env,mp,mk,l,g, time_sleep, terminate, seed=0, R=R)
+        
+    plt.legend()
+    plt.show()
+
     return
 
-def control(env, mp, mk, l, g, time_sleep=False, terminate=True, seed=None):
+def control(env, mp, mk, l, g, time_sleep=False, terminate=True, seed=None, R=1):
     """
     Control using LQR
     """
 
     observation_history=[]  
-    titles = ["$x$", r"$\dot{x}$", r"$\theta$", r"$\dot{\theta}$"]
-
+    force_history=[]
     obs, _ = env.reset(seed=seed)    # Reset the environment for a new episode
     
     A, B = linerized_cartpole_system(mp, mk, l, g)
-    K = optimal_controller(A, B)    # Re-compute the optimal controller for the current R value
+    K = optimal_controller(A, B, R_value=R)    # Re-compute the optimal controller for the current R value
 
     for i in range(1000):
 
@@ -96,7 +100,8 @@ def control(env, mp, mk, l, g, time_sleep=False, terminate=True, seed=None):
         
         # get force direction (action) and force value (force)
         action, force = apply_state_controller(K, obs)
-        
+        force_history.append(force)
+
         # absolute value, since 'action' determines the sign, F_min = -10N, F_max = 10N
         abs_force = abs(float(np.clip(force, -10, 10)))
         
@@ -114,19 +119,29 @@ def control(env, mp, mk, l, g, time_sleep=False, terminate=True, seed=None):
             print(f'Terminated after {i+1} iterations.')
             break
 
-    x = np.arange(1, len(observation_history) + 1)
-    observation_history = np.array(observation_history)
-    
-    for i,data in enumerate(observation_history.T):
-        plt.plot(x,data, label=titles[i])
+    # Task 1
+    if task==1:
+        titles = ["$x$", r"$\dot{x}$", r"$\theta$", r"$\dot{\theta}$"]
+        x = np.arange(1, len(observation_history) + 1)
+        observation_history = np.array(observation_history)
+        
+        for i,data in enumerate(observation_history.T):
+            plt.plot(x,data, label=titles[i])
 
-    plt.axhline(y=0.003, color='black', linestyle=':', linewidth='1')
-    plt.axhline(y=-0.003, color='black', linestyle=':', linewidth='1')
+        plt.axhline(y=0.003, color='black', linestyle=':', linewidth='1')
+        plt.axhline(y=-0.003, color='black', linestyle=':', linewidth='1')
 
-    plt.legend()
-    plt.show()
+        plt.legend()
+        plt.show()
+
+    # Task 2
+    if task==2:
+        plt.plot(np.arange(1,len(force_history)+1),force_history, label=f"R={R}")
+
+task=0
 # The main function
 def main(args):
+    global task
     # Create a Gymnasium environment (CartPole-v1)
     env = gym.make(args.env)
 
@@ -145,8 +160,10 @@ def main(args):
     mp, mk, l, g = pole.masspole, pole.masscart, pole.length, pole.gravity
 
     if args.mode == "control":
+        task=1
         control(env, mp, mk, l, g, args.time_sleep, terminate=False, seed=args.seed)
     elif args.mode == "multiple_R":
+        task=2
         multiple_R(env, mp, mk, l, g, args.time_sleep, terminate=True)
 
     env.close()
