@@ -63,8 +63,7 @@ def train(agent, env, train_episodes, early_stop=True, render=False,
                 """
                 Sample a random action from the action space
                 """
-                # TODO
-                # ...
+                action=env.action_space.sample()
 
             previous_observation = observation
 
@@ -80,8 +79,7 @@ def train(agent, env, train_episodes, early_stop=True, render=False,
             """
                 Use a different reward, overwriting the original one
             """
-            # TODO
-            # reward = new_reward(observation, x0)
+            reward = new_reward(observation, x0)
 
             # Store action's outcome (so that the agent can improve its policy)
             agent.store_outcome(previous_observation, action_probabilities, action, reward)
@@ -140,8 +138,6 @@ def test(agent, env, episodes, render=False, x0=0):
             """
             Test on 500 timesteps
             """
-            # TODO
-
             action, _ = agent.get_action(observation, evaluation=True)  # Similar to the training loop above -
                                                                         # get the action, act on the environment, save total reward
                                                                         # (evaluation=True makes the agent always return what it thinks to be
@@ -153,8 +149,7 @@ def test(agent, env, episodes, render=False, x0=0):
             """
                 Use a different reward, overwriting the original one
             """
-            # TODO
-            # reward = new_reward(observation, x0)
+            reward = new_reward(observation, x0)
 
             if render:
                 env.render()
@@ -168,11 +163,9 @@ def new_reward(state, x0):
     """
         Use a different reward, overwriting the original one
     """
-    # TODO
-    # ...
-    reward = ...
     
-    return reward
+    # return 1 - ((state[0] - x0) ** 2 + (state[2] ** 2))
+    return (1+abs(state[1]))/(1+(state[0]-x0)**2)
 
 # The main function
 def main(args):
@@ -184,8 +177,7 @@ def main(args):
     """
     # For CartPole-v1 - change the maximum episode length to 1000
     """
-    # TODO
-    env._max_episode_steps = 500
+    env._max_episode_steps = 1000
 
     # Get dimensionalities of actions and observations
     action_space_dim = get_space_dim(env.action_space)
@@ -194,6 +186,7 @@ def main(args):
     # Instantiate agent and its policy
     policy = Policy(observation_space_dim, action_space_dim)
     agent = Agent(policy)
+    # agent.optimizer = torch.optim.Adam(policy.parameters(), lr=1e-1)
 
     # Print some stuff
     print("Environment:", args.env)
