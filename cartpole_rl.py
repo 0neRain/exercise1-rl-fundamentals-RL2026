@@ -35,18 +35,23 @@ def parse_args(args=sys.argv[1:]):
     parser.add_argument("--central_point", type=float, default=0.0,
                         help="Point x0 to fluctuate around")
     parser.add_argument("--random_policy", action='store_true', help="Applying a random policy training")
+    parser.add_argument("--reward", type=int, default=0, help="Select the reward function")
     return parser.parse_args(args)
 
 
+ep= 0
 # Policy training function
 def train(agent, env, train_episodes, early_stop=True, render=False,
-          silent=False, train_run_id=0, x0=0, random_policy=False):
+          silent=False, train_run_id=0, x0=0, random_policy=False, reward_type=0):
     # Arrays to keep track of rewards
     reward_history, timestep_history = [], []
     average_reward_history = []
-
+    
+    global ep
     # Run actual training
     for episode_number in range(train_episodes):
+        
+        ep= episode_number
         reward_sum, timesteps = 0, 0
         done = False
         # Reset the environment and observe the initial state (it's a random initial state with small values)
@@ -79,7 +84,7 @@ def train(agent, env, train_episodes, early_stop=True, render=False,
             """
                 Use a different reward, overwriting the original one
             """
-            reward = new_reward(observation, x0)
+            reward = new_reward(observation, x0, reward_type=reward_type)
 
             # Store action's outcome (so that the agent can improve its policy)
             agent.store_outcome(previous_observation, action_probabilities, action, reward)
@@ -124,13 +129,15 @@ def train(agent, env, train_episodes, early_stop=True, render=False,
 
 
 # Function to test a trained policy
-def test(agent, env, episodes, render=False, x0=0):
+def test(agent, env, episodes, render=False, x0=0, reward_type=0):
     test_reward, test_len = 0, 0
 
     episodes = 100
     print('Num testing episodes:', episodes)
-
-    for ep in range(episodes):
+    global ep
+    max_speed= 0
+    for e in range(episodes):
+        ep= e
         done = False
         observation, _ = env.reset()
         while not done:
@@ -144,29 +151,49 @@ def test(agent, env, episodes, render=False, x0=0):
                                                                         # the best action - there is no exploration at this point)
             observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
-
             # Task 3.1
             """
                 Use a different reward, overwriting the original one
             """
-            reward = new_reward(observation, x0)
+            max_speed= max(max_speed, abs(observation[1]))
+            reward = new_reward(observation, x0, reward_type=reward_type)
 
             if render:
                 env.render()
             test_reward += reward
             test_len += 1
-    print("Average test reward:", test_reward/episodes, "episode length:", test_len/episodes)
+    print("Average test reward:", test_reward/episodes, "episode length:", test_len/episodes, "max speed:", max_speed)
 
+# def w_schedule(episode, w_start=1.0, w_final=2.0, step=0.1, episodes_per_step=200):
+#     """Raise w by `step` every `episodes_per_step` episodes, capped at w_final."""
+#     return min(w_start + step * (episode // episodes_per_step), w_final)
 
-def new_reward(state, x0):
+def new_reward(state, x0, reward_type=0):
     # Task 3.1
     """
         Use a different reward, overwriting the original one
     """
     
-    # return 1 - ((state[0] - x0) ** 2 + (state[2] ** 2))
-    return (1+abs(state[1]))/(1+(state[0]-x0)**2)
+    if reward_type == 0:
+        return 1 + 1/(1+(state[0]-x0)**2) 
+    elif reward_type == 2:
+        # x, x_dot, theta, theta_dot = state
+        # A = 1.6    # oscillation amplitude, keep it well below the 2.4 limit
+        # w = 1.0    # oscillation frequency; peak speed at the center = w * A
 
+        # E = (x_dot / w) ** 2 + x ** 2                   # squared distance from origin in (x, x_dot/w)
+
+        # rew = 1.0                                        # alive bonus
+        # rew += 2.0 * np.exp(-((E - A ** 2) / 1.0) ** 2)  # stay on the oscillation ellipse
+        # rew += 0.3 * abs(x_dot)                          # keep moving, don't park at an edge
+        # rew -= 0.5 * theta ** 2                          # mild pole stability
+        rew = 1 + abs(state[1])
+        th= 1.6
+        if abs(state[0]) > th:
+            rew -= 5*abs((abs(state[0]) - th)) + (state[1] - 2*state[2]) * state[0]/abs(state[0])
+        else:
+            rew+= abs(state[0]-x0)/2.4
+        return rew
 # The main function
 def main(args):
     # Create a Gymnasium environment (CartPole-v1)
@@ -177,7 +204,7 @@ def main(args):
     """
     # For CartPole-v1 - change the maximum episode length to 1000
     """
-    env._max_episode_steps = 1000
+    env._max_episode_steps = 2000
 
     # Get dimensionalities of actions and observations
     action_space_dim = get_space_dim(env.action_space)
@@ -198,7 +225,7 @@ def main(args):
     # Otherwise load the policy from the file and go directly to testing.
     if args.test is None:
         # Train
-        training_history = train(agent, env, args.train_episodes, False, args.render_training, x0=args.central_point, random_policy=args.random_policy)
+        training_history = train(agent, env, args.train_episodes, False, args.render_training, x0=args.central_point, random_policy=args.random_policy, reward_type=args.reward)
 
         # Save the model
         model_file = "%s_params.ai" % args.env
@@ -218,7 +245,7 @@ def main(args):
         state_dict = torch.load(args.test)
         policy.load_state_dict(state_dict)
         print("Testing...")
-        test(agent, env, args.train_episodes, args.render_test)
+        test(agent, env, args.train_episodes, args.render_test, reward_type=args.reward)
 
 
 # Entry point of the script
